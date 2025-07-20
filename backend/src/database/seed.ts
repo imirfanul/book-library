@@ -4,6 +4,13 @@ async function seedDatabase() {
   try {
     console.log('🌱 Starting database seeding...');
     
+    // Check if data already exists
+    const existingFonts = await pool.query('SELECT COUNT(*) FROM fonts');
+    if (parseInt(existingFonts.rows[0].count) > 0) {
+      console.log('📊 Database already contains data, skipping seed');
+      return;
+    }
+    
     // Insert sample fonts
     const fontQuery = `
       INSERT INTO fonts (name, filename, file_path, file_size) VALUES
@@ -12,7 +19,6 @@ async function seedDatabase() {
       ('Lato', 'Lato-Regular.ttf', '/uploads/sample/lato.ttf', 122504),
       ('Montserrat', 'Montserrat-Regular.ttf', '/uploads/sample/montserrat.ttf', 191876),
       ('Source Sans Pro', 'SourceSansPro-Regular.ttf', '/uploads/sample/sourcesans.ttf', 134892)
-      ON CONFLICT DO NOTHING
     `;
     
     await pool.query(fontQuery);
@@ -29,7 +35,6 @@ async function seedDatabase() {
         ('Web Headers', 'Perfect fonts for website headers and titles'),
         ('Body Text Collection', 'Readable fonts ideal for body text and paragraphs'),
         ('Modern Sans Serif', 'Contemporary sans-serif fonts for modern designs')
-        ON CONFLICT DO NOTHING
         RETURNING id, name
       `;
       
@@ -46,10 +51,17 @@ async function seedDatabase() {
         
         for (const assoc of associations) {
           for (const fontId of assoc.fonts) {
-            await pool.query(
-              'INSERT INTO font_group_fonts (group_id, font_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-              [assoc.group, fontId]
-            );
+            try {
+              await pool.query(
+                'INSERT INTO font_group_fonts (group_id, font_id) VALUES ($1, $2)',
+                [assoc.group, fontId]
+              );
+            } catch (error) {
+              // Ignore duplicate key errors
+              if (!error.message.includes('duplicate key')) {
+                throw error;
+              }
+            }
           }
         }
         
@@ -66,4 +78,9 @@ async function seedDatabase() {
   }
 }
 
-seedDatabase();
+// Only run if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seedDatabase();
+}
+
+export { seedDatabase };

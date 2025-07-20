@@ -10,7 +10,9 @@
     "start": "node dist/server.js",
     "db:migrate": "tsx src/database/migrate.ts",
     "db:seed": "tsx src/database/seed.ts",
-    "db:reset": "npm run db:migrate && npm run db:seed"
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "docker:migrate": "docker-compose exec backend npm run db:migrate",
+    "docker:seed": "docker-compose exec backend npm run db:seed"
   },
   "dependencies": {
     "express": "^4.18.2",

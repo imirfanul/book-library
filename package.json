@@ -12,7 +12,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "install:backend": "cd backend && npm install",
-    "setup": "npm install && npm run install:backend"
+    "setup": "npm install && npm run install:backend",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker-compose down -v && docker system prune -f",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed",
+    "db:reset": "cd backend && npm run db:reset"
   },
   "dependencies": {
     "clsx": "^2.1.1",
