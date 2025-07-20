@@ -5,7 +5,7 @@ import { Font } from '../../../shared/types';
 
 interface FontGroupCreatorProps {
   fonts: Font[];
-  onCreate: (groupData: { name: string; fonts: Font[] }) => void;
+  onCreate: (groupData: { name: string; description?: string; fonts: Font[] }) => Promise<void>;
 }
 
 interface FontRow {
@@ -15,10 +15,12 @@ interface FontRow {
 
 export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCreate }) => {
   const [groupName, setGroupName] = useState('');
+  const [description, setDescription] = useState('');
   const [fontRows, setFontRows] = useState<FontRow[]>([
     { id: '1', selectedFont: null }
   ]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const addRow = () => {
     const newRow: FontRow = {
@@ -54,25 +56,40 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
       newErrors.push('You must select at least two fonts');
     }
 
+    // Check for duplicate font selections
+    const fontIds = selectedFonts.map(row => row.selectedFont!.id);
+    const uniqueFontIds = new Set(fontIds);
+    if (fontIds.length !== uniqueFontIds.size) {
+      newErrors.push('Cannot select the same font multiple times');
+    }
     setErrors(newErrors);
     return newErrors.length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
+      setIsCreating(true);
       const selectedFonts = fontRows
         .filter(row => row.selectedFont)
         .map(row => row.selectedFont!);
       
-      onCreate({
-        name: groupName,
-        fonts: selectedFonts
-      });
+      try {
+        await onCreate({
+          name: groupName,
+          description: description.trim() || undefined,
+          fonts: selectedFonts
+        });
 
-      // Reset form
-      setGroupName('');
-      setFontRows([{ id: '1', selectedFont: null }]);
-      setErrors([]);
+        // Reset form
+        setGroupName('');
+        setDescription('');
+        setFontRows([{ id: '1', selectedFont: null }]);
+        setErrors([]);
+      } catch (error) {
+        setErrors(['Failed to create font group. Please try again.']);
+      } finally {
+        setIsCreating(false);
+      }
     }
   };
 
@@ -81,6 +98,19 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
     ...fonts.map(font => ({ value: font.id, label: font.name }))
   ];
 
+  // Get available fonts for each row (excluding already selected ones)
+  const getAvailableFonts = (currentRowId: string) => {
+    const selectedFontIds = fontRows
+      .filter(row => row.id !== currentRowId && row.selectedFont)
+      .map(row => row.selectedFont!.id);
+    
+    return [
+      { value: '', label: 'Select a Font' },
+      ...fonts
+        .filter(font => !selectedFontIds.includes(font.id))
+        .map(font => ({ value: font.id, label: font.name }))
+    ];
+  };
   return (
     <Card variant="elevated" className="p-8">
       <div className="space-y-6">
@@ -108,8 +138,15 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             className="text-lg font-medium"
+            disabled={isCreating}
           />
 
+          <Input
+            placeholder="Enter description (optional)..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={isCreating}
+          />
           <div className="space-y-4">
             {fontRows.map((row, index) => (
               <div 
@@ -126,7 +163,8 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
                       const selectedFont = fonts.find(f => f.id === e.target.value) || null;
                       updateRow(row.id, selectedFont);
                     }}
-                    options={fontOptions}
+                    options={getAvailableFonts(row.id)}
+                    disabled={isCreating}
                   />
                 </div>
 
@@ -135,6 +173,7 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
                     variant="danger"
                     size="sm"
                     onClick={() => removeRow(row.id)}
+                    disabled={isCreating}
                     className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                   >
                     <X size={16} />
@@ -148,6 +187,7 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
             <Button
               variant="secondary"
               onClick={addRow}
+              disabled={isCreating}
               className="flex items-center space-x-2"
             >
               <Plus size={18} />
@@ -158,9 +198,10 @@ export const FontGroupCreator: React.FC<FontGroupCreatorProps> = ({ fonts, onCre
               variant="success"
               onClick={handleSubmit}
               size="lg"
+              isLoading={isCreating}
               className="px-8"
             >
-              Create Group
+              {isCreating ? 'Creating...' : 'Create Group'}
             </Button>
           </div>
         </div>

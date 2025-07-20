@@ -2,14 +2,20 @@ export interface Font {
   id: string;
   name: string;
   filename: string;
-  uploadedAt: Date;
+  file_path?: string;
+  file_size?: number;
+  uploaded_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FontGroup {
   id: string;
   name: string;
+  description?: string;
   fonts: Font[];
-  createdAt: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Author {

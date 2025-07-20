@@ -3,26 +3,31 @@ import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import { Card } from '../../../shared/components/UI';
 
 interface FontUploadProps {
-  onUpload: (file: File) => void;
+  onUpload: (file: File, name?: string) => Promise<void>;
+  error?: string | null;
+  success?: string | null;
 }
 
-export const FontUpload: React.FC<FontUploadProps> = ({ onUpload }) => {
+export const FontUpload: React.FC<FontUploadProps> = ({ onUpload, error, success }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): boolean => {
     if (!file.name.toLowerCase().endsWith('.ttf')) {
-      setError('Only TTF files are allowed');
-      setSuccess(null);
+      setLocalError('Only TTF files are allowed');
       return false;
     }
-    setError(null);
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      setLocalError('File size must be less than 5MB');
+      return false;
+    }
+    setLocalError(null);
     return true;
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
     
@@ -30,20 +35,34 @@ export const FontUpload: React.FC<FontUploadProps> = ({ onUpload }) => {
     const file = files[0];
     
     if (file && validateFile(file)) {
-      onUpload(file);
-      setSuccess(`Successfully uploaded ${file.name}`);
-      setTimeout(() => setSuccess(null), 3000);
+      setIsUploading(true);
+      try {
+        await onUpload(file);
+      } catch (err) {
+        // Error handled by parent component
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && validateFile(file)) {
-      onUpload(file);
-      setSuccess(`Successfully uploaded ${file.name}`);
-      setTimeout(() => setSuccess(null), 3000);
+      setIsUploading(true);
+      try {
+        await onUpload(file);
+        // Reset file input
+        e.target.value = '';
+      } catch (err) {
+        // Error handled by parent component
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
+
+  const displayError = error || localError;
 
   return (
     <Card variant="elevated" className="p-8">
@@ -54,33 +73,41 @@ export const FontUpload: React.FC<FontUploadProps> = ({ onUpload }) => {
         </div>
         
         <div
-          className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer group ${
+          className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300 group ${
             isDragOver
               ? 'border-indigo-400 bg-gradient-to-br from-indigo-50 to-purple-50 scale-105'
-              : 'border-slate-300 hover:border-indigo-400 hover:bg-gradient-to-br hover:from-indigo-50 hover:to-purple-50 hover:scale-105'
-          }`}
+              : isUploading
+              ? 'border-indigo-400 bg-gradient-to-br from-indigo-50 to-purple-50'
+              : 'border-slate-300 hover:border-indigo-400 hover:bg-gradient-to-br hover:from-indigo-50 hover:to-purple-50 hover:scale-105 cursor-pointer'
+          } ${isUploading ? 'pointer-events-none' : ''}`}
           onDragOver={(e) => {
             e.preventDefault();
             setIsDragOver(true);
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => !isUploading && fileInputRef.current?.click()}
         >
           <div className="space-y-4">
             <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isDragOver 
+              isUploading
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'
+              : isDragOver 
                 ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white scale-110' 
                 : 'bg-slate-100 text-slate-400 group-hover:bg-gradient-to-r group-hover:from-indigo-500 group-hover:to-purple-500 group-hover:text-white group-hover:scale-110'
             }`}>
-              <Upload size={24} />
+              {isUploading ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Upload size={24} />
+              )}
             </div>
             
             <div>
               <p className="text-lg font-semibold text-slate-700 mb-2">
-                Click to upload or drag and drop
+                {isUploading ? 'Uploading...' : 'Click to upload or drag and drop'}
               </p>
-              <p className="text-sm text-slate-500">Only TTF files are allowed</p>
+              <p className="text-sm text-slate-500">Only TTF files are allowed (max 5MB)</p>
             </div>
           </div>
           
@@ -89,15 +116,16 @@ export const FontUpload: React.FC<FontUploadProps> = ({ onUpload }) => {
             type="file"
             accept=".ttf"
             onChange={handleFileSelect}
+            disabled={isUploading}
             className="hidden"
           />
         </div>
 
         {/* Status Messages */}
-        {error && (
+        {displayError && (
           <div className="flex items-center space-x-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 animate-in slide-in-from-top-2 duration-300">
             <AlertCircle size={20} />
-            <span className="font-medium">{error}</span>
+            <span className="font-medium">{displayError}</span>
           </div>
         )}
 
